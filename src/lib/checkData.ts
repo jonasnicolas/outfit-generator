@@ -2,7 +2,12 @@ import { supabase } from './supabase';
 
 export async function checkDataMismatch() {
   console.log('=== CHECKING DATA MISMATCH ===');
-  
+
+  if (!supabase) {
+    console.warn('Supabase is not configured; nothing to check.');
+    return;
+  }
+
   try {
     // Check database records
     const { data: dbData, error: dbError } = await supabase

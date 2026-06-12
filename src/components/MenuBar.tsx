@@ -1,9 +1,4 @@
-interface MenuBarProps {
-
-}
-
-export function MenuBar({
-}: MenuBarProps) {
+export function MenuBar() {
   return (
     <div
       style={{

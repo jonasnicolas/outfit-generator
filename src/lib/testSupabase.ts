@@ -5,6 +5,14 @@ export async function testSupabaseConnection(): Promise<{
   message: string;
   details?: any;
 }> {
+  if (!supabase) {
+    return {
+      success: false,
+      message:
+        'Supabase is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env.',
+    };
+  }
+
   try {
     // Test 1: Basic connection
     const { error } = await supabase
