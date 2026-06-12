@@ -4,6 +4,7 @@ import { useCarousel } from "./hooks/useCarousel";
 import { useOutfitGeneration } from "./hooks/useOutfitGeneration";
 import {
   addClothingItem,
+  deleteClothingItem,
   getClothingItems,
   ClothingItem as SupabaseClothingItem,
 } from "./lib/supabase";
@@ -31,6 +32,26 @@ const toLocalItems = (
 
 const defaultLocalTops = toLocalItems(defaultTops, 10);
 const defaultLocalBottoms = toLocalItems(defaultBottoms, 9);
+
+// The built-in outfits live only in code, not in Supabase, so they can't be
+// deleted. Anything else came from an upload and is removable.
+const defaultItemIds = new Set(
+  [...defaultLocalTops, ...defaultLocalBottoms].map((item) => item.id)
+);
+const isUploadedItem = (item: LocalClothingItem): boolean =>
+  !defaultItemIds.has(item.id);
+
+// Only allow real images up to 5 MB to be uploaded.
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
+const validateUploadFile = (file: File): string | null => {
+  if (!file.type.startsWith("image/")) {
+    return `"${file.name}" isn't an image file.`;
+  }
+  if (file.size > MAX_UPLOAD_BYTES) {
+    return `"${file.name}" is larger than 5 MB.`;
+  }
+  return null;
+};
 
 // Import components
 import { MenuBar } from "./components/MenuBar";
@@ -179,11 +200,28 @@ function App() {
         debugLog("Files selected:", files?.length);
 
         if (files && files.length > 0) {
+          // Validate before uploading: skip non-images and oversized files.
+          const validFiles: File[] = [];
+          const problems: string[] = [];
+          for (const file of Array.from(files)) {
+            const problem = validateUploadFile(file);
+            if (problem) problems.push(problem);
+            else validFiles.push(file);
+          }
+
+          if (problems.length > 0) {
+            alert(`Skipped some files:\n\n${problems.join("\n")}`);
+          }
+          if (validFiles.length === 0) {
+            setShowUploadMenu(false);
+            return;
+          }
+
           setIsUploading(true);
           setShowUploadMenu(false);
 
           try {
-            const uploadPromises = Array.from(files).map(
+            const uploadPromises = validFiles.map(
               async (file, index) => {
                 const nextNumber =
                   (category === "tops" ? topsList.length : bottomsList.length) +
@@ -371,6 +409,26 @@ function App() {
     console.error("Failed to load image:", imageUrl);
   }, []);
 
+  // Delete an uploaded clothing item from storage, the database, and the UI.
+  const handleDeleteItem = useCallback(
+    async (category: "tops" | "bottoms", item: LocalClothingItem) => {
+      if (!window.confirm(`Delete "${item.name}"? This can't be undone.`)) {
+        return;
+      }
+      try {
+        await deleteClothingItem(item.id);
+        const remove = (prev: LocalClothingItem[]) =>
+          prev.filter((i) => i.id !== item.id);
+        if (category === "tops") setTopsList(remove);
+        else setBottomsList(remove);
+      } catch (error) {
+        console.error(`Error deleting ${item.name}:`, error);
+        alert(`Failed to delete "${item.name}". Please try again.`);
+      }
+    },
+    []
+  );
+
   // Handle nano banana styling
   const handleNanoStyle = useCallback(async () => {
     if (!nanoText.trim()) {
@@ -470,6 +528,8 @@ function App() {
               carousel={topsCarousel}
               category="tops"
               onImageError={handleImageError}
+              onDelete={(item) => handleDeleteItem("tops", item)}
+              isDeletable={isUploadedItem}
             />
 
             <ClothingCarousel
@@ -477,6 +537,8 @@ function App() {
               carousel={bottomsCarousel}
               category="bottoms"
               onImageError={handleImageError}
+              onDelete={(item) => handleDeleteItem("bottoms", item)}
+              isDeletable={isUploadedItem}
             />
 
             <ControlButtons

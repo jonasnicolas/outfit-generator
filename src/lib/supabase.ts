@@ -170,10 +170,13 @@ export async function addClothingItem(
   imageFile: File
 ): Promise<ClothingItem> {
   if (!supabase) throw new Error(NOT_CONFIGURED_MESSAGE);
-  // Generate unique filename
+  // Generate unique filename. Include a random suffix so that uploading
+  // several files in the same millisecond (Promise.all) can't collide and
+  // overwrite each other in storage.
   const timestamp = Date.now();
+  const uniqueSuffix = Math.random().toString(36).slice(2, 8);
   const fileExtension = imageFile.name.split(".").pop();
-  const fileName = `${category}_${timestamp}.${fileExtension}`;
+  const fileName = `${category}_${timestamp}_${uniqueSuffix}.${fileExtension}`;
 
   // Upload image to storage
   const imageUrl = await uploadImage("CLOTHING", imageFile, fileName);
