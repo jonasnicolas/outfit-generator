@@ -8,7 +8,29 @@ import {
   ClothingItem as SupabaseClothingItem,
 } from "./lib/supabase";
 import { rateLimiter } from "./services/rateLimiter";
+import { tops as defaultTops, bottoms as defaultBottoms } from "./data/items";
 import { LocalClothingItem, RateLimitResult } from "./types";
+
+// The app ships with a set of built-in outfits so it works out of the box,
+// with or without Supabase. Any items uploaded to Supabase are added on top.
+const toLocalItems = (
+  items: { id: string; name: string; imageUrl: string; offset?: Partial<{ x: number; y: number; scale: number; zIndex: number }> }[],
+  fallbackZIndex: number
+): LocalClothingItem[] =>
+  items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    imageUrl: item.imageUrl,
+    offset: {
+      x: item.offset?.x ?? 0,
+      y: item.offset?.y ?? 0,
+      scale: item.offset?.scale ?? 1,
+      zIndex: item.offset?.zIndex ?? fallbackZIndex,
+    },
+  }));
+
+const defaultLocalTops = toLocalItems(defaultTops, 10);
+const defaultLocalBottoms = toLocalItems(defaultBottoms, 9);
 
 // Import components
 import { MenuBar } from "./components/MenuBar";
@@ -27,8 +49,9 @@ const debugLog = (...args: any[]) => {
 function App() {
   const [previewTop, setPreviewTop] = useState<number>(0);
   const [previewBottom, setPreviewBottom] = useState<number>(0);
-  const [topsList, setTopsList] = useState<LocalClothingItem[]>([]);
-  const [bottomsList, setBottomsList] = useState<LocalClothingItem[]>([]);
+  const [topsList, setTopsList] = useState<LocalClothingItem[]>(defaultLocalTops);
+  const [bottomsList, setBottomsList] =
+    useState<LocalClothingItem[]>(defaultLocalBottoms);
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [showUploadMenu, setShowUploadMenu] = useState<boolean>(false);
   const [generationProgress, setGenerationProgress] = useState<number>(0);
@@ -83,20 +106,21 @@ function App() {
           })
         );
 
-        // Always set the lists, even if empty
-        // this is so that you can see this
-        setTopsList(convertedTops);
-        setBottomsList(convertedBottoms);
+        // Show the built-in outfits plus anything uploaded to Supabase.
+        // When Supabase isn't configured these arrays are empty, so the
+        // user still sees the built-in defaults.
+        setTopsList([...defaultLocalTops, ...convertedTops]);
+        setBottomsList([...defaultLocalBottoms, ...convertedBottoms]);
 
         debugLog(
           `Set ${convertedTops.length} tops and ${convertedBottoms.length} bottoms`
         );
       } catch (error) {
         console.error("Error loading clothing items from Supabase:", error);
-        // Fall back to empty arrays if database fails
-        setTopsList([]);
-        setBottomsList([]);
-        debugLog("Falling back to empty arrays due to database error");
+        // Fall back to the built-in outfits if the database call fails.
+        setTopsList(defaultLocalTops);
+        setBottomsList(defaultLocalBottoms);
+        debugLog("Falling back to built-in outfits due to database error");
       }
     };
 
@@ -281,7 +305,7 @@ function App() {
 
   // Progress animation effect
   useEffect(() => {
-    let interval: NodeJS.Timeout;
+    let interval: ReturnType<typeof setInterval>;
 
     if (isGenerating) {
       setGenerationProgress(0);

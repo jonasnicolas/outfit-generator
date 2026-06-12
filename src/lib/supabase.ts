@@ -1,13 +1,29 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error("Missing Supabase environment variables");
+// Supabase is optional: it powers uploading your own clothes and cloud caching
+// of generated outfits. When it isn't configured, the app still runs with the
+// built-in outfits — we just disable the cloud features instead of crashing.
+export const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+
+if (!isSupabaseConfigured) {
+  console.warn(
+    "[Outfit98] Supabase is not configured (missing VITE_SUPABASE_URL / " +
+      "VITE_SUPABASE_ANON_KEY). Uploading and cloud caching are disabled; " +
+      "the built-in outfits will still work."
+  );
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase: SupabaseClient | null = isSupabaseConfigured
+  ? createClient(supabaseUrl as string, supabaseAnonKey as string)
+  : null;
+
+// Thrown by write operations that genuinely require a configured backend.
+const NOT_CONFIGURED_MESSAGE =
+  "Supabase is not configured. Add VITE_SUPABASE_URL and " +
+  "VITE_SUPABASE_ANON_KEY to your .env to enable uploads.";
 
 // Database types
 export interface ClothingItem {
@@ -40,6 +56,7 @@ export async function uploadImage(
   file: File,
   fileName: string
 ): Promise<string> {
+  if (!supabase) throw new Error(NOT_CONFIGURED_MESSAGE);
   const bucketName = STORAGE_BUCKETS[bucket];
 
   const { data, error } = await supabase.storage
@@ -66,6 +83,7 @@ export async function deleteImage(
   bucket: keyof typeof STORAGE_BUCKETS,
   fileName: string
 ): Promise<void> {
+  if (!supabase) throw new Error(NOT_CONFIGURED_MESSAGE);
   const bucketName = STORAGE_BUCKETS[bucket];
 
   const { error } = await supabase.storage.from(bucketName).remove([fileName]);
@@ -80,6 +98,7 @@ export function getImageUrl(
   bucket: keyof typeof STORAGE_BUCKETS,
   fileName: string
 ): string {
+  if (!supabase) return "";
   const bucketName = STORAGE_BUCKETS[bucket];
 
   const { data } = supabase.storage.from(bucketName).getPublicUrl(fileName);
@@ -93,6 +112,7 @@ export function pairKey(topId: string, bottomId: string) {
 }
 
 export async function getCachedComposite(topId: string, bottomId: string) {
+  if (!supabase) return null;
   const { data, error } = await supabase
     .from("generated_outfits")
     .select("generated_image_url")
@@ -113,6 +133,7 @@ export async function saveCachedComposite(
   bottomId: string,
   generatedImageUrl: string
 ) {
+  if (!supabase) return;
   const { error } = await supabase.from("generated_outfits").upsert({
     top_id: topId,
     bottom_id: bottomId,
@@ -128,6 +149,7 @@ export async function saveCachedComposite(
 export async function getClothingItems(
   category: "tops" | "bottoms"
 ): Promise<ClothingItem[]> {
+  if (!supabase) return [];
   const { data, error } = await supabase
     .from("clothing_items")
     .select("*")
@@ -147,6 +169,7 @@ export async function addClothingItem(
   category: "tops" | "bottoms",
   imageFile: File
 ): Promise<ClothingItem> {
+  if (!supabase) throw new Error(NOT_CONFIGURED_MESSAGE);
   // Generate unique filename
   const timestamp = Date.now();
   const fileExtension = imageFile.name.split(".").pop();
@@ -175,6 +198,7 @@ export async function addClothingItem(
 }
 
 export async function deleteClothingItem(id: string): Promise<void> {
+  if (!supabase) throw new Error(NOT_CONFIGURED_MESSAGE);
   // Get the item to find the image URL
   const { data: item, error: fetchError } = await supabase
     .from("clothing_items")

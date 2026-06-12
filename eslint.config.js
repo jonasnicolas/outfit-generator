@@ -37,6 +37,13 @@ export default [
         'warn',
         { allowConstantExport: true },
       ],
+      // This codebase intentionally uses `any` for API error handling and the
+      // window-scoped image caches; the explicit-any rule adds noise here.
+      '@typescript-eslint/no-explicit-any': 'off',
+      // The Gemini retry helpers use `while (true) { ... break }` on purpose.
+      'no-constant-condition': ['error', { checkLoops: false }],
+      // Empty `catch {}` blocks are used deliberately to swallow parse errors.
+      'no-empty': ['error', { allowEmptyCatch: true }],
     },
   },
 ]
