@@ -19,16 +19,22 @@ A cozy Windows 98-inspired desktop app that lets you choose tops and bottoms, up
    git clone <your-fork-url> outfit98 && cd outfit98
    npm install
 
-2. **Add your .env file**
-```VITE_SUPABASE_URL=your_supabase_project_url
+2. **Run the app**
+```npm run dev```
+Your retro window should pop up! 
+Note: a electron popup might show up and not work so you can just open it in the browser.
+
+The app works out of the box with a set of built-in outfits — no `.env` required.
+
+3. **(Optional) Add your .env file**
+
+The keys below unlock the *extra* features. The app runs fine without them — you just won't be able to upload your own clothes (Supabase) or generate AI previews (Google).
+```
+VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 VITE_GOOGLE_API_KEY=your_google_api_key
 ```
-
-3. **Run the app**
-```npm run dev```
-Your retro window should pop up! 
-Note: a electron popup might show up and not work so you can just open it in the browser. 
+Then restart the app. See the sections below for how to set each one up. 
 
 ---
 

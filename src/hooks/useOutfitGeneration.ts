@@ -25,10 +25,9 @@ export function useOutfitGeneration(): UseOutfitGenerationReturn {
 
   // Check API key availability
   useEffect(() => {
-    const hasValidApiKey = Boolean(
-      import.meta.env.VITE_GOOGLE_API_KEY &&
-        import.meta.env.VITE_GOOGLE_API_KEY !== "your_google_api_key_here"
-    );
+    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+    // Treat the .env.example placeholder (and an empty value) as "no key".
+    const hasValidApiKey = Boolean(apiKey) && !apiKey.startsWith("your_google_api_key");
     setApiRequired(!hasValidApiKey);
   }, []);
 
