@@ -11,6 +11,8 @@ interface ClothingCarouselProps {
   carousel: CarouselControls;
   category: "tops" | "bottoms";
   onImageError: (imageUrl: string) => void;
+  onDelete?: (item: LocalClothingItem) => void;
+  isDeletable?: (item: LocalClothingItem) => boolean;
 }
 
 export function ClothingCarousel({
@@ -18,6 +20,8 @@ export function ClothingCarousel({
   carousel,
   category,
   onImageError,
+  onDelete,
+  isDeletable,
 }: ClothingCarouselProps) {
   const isTops = category === "tops";
   const sectionClass = isTops
@@ -35,14 +39,37 @@ export function ClothingCarousel({
           aria-label={`Previous ${category.slice(0, -1)}`}
           disabled={items.length === 0}
         />
-        <div className="clothes-window">
+        <div className="clothes-window" style={{ position: "relative" }}>
           {items.length > 0 && items[carousel.index] ? (
-            <img
-              src={items[carousel.index].imageUrl}
-              alt={items[carousel.index].name}
-              className="clothing-item"
-              onError={() => onImageError(items[carousel.index].imageUrl)}
-            />
+            <>
+              <img
+                src={items[carousel.index].imageUrl}
+                alt={items[carousel.index].name}
+                className="clothing-item"
+                onError={() => onImageError(items[carousel.index].imageUrl)}
+              />
+              {onDelete && isDeletable?.(items[carousel.index]) && (
+                <button
+                  onClick={() => onDelete(items[carousel.index])}
+                  title={`Delete ${items[carousel.index].name}`}
+                  aria-label={`Delete ${items[carousel.index].name}`}
+                  style={{
+                    position: "absolute",
+                    top: "4px",
+                    right: "4px",
+                    width: "20px",
+                    height: "20px",
+                    minWidth: "20px",
+                    padding: 0,
+                    fontSize: "11px",
+                    lineHeight: "1",
+                    cursor: "pointer",
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </>
           ) : (
             <div
               style={{
