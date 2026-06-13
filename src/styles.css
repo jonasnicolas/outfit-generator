@@ -19,6 +19,10 @@ body {
   -webkit-font-smoothing: none;
   font-smooth: never;
   image-rendering: pixelated;
+  /* Native-WebView feel: no rubber-band bounce, no tap flash / long-press menu */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 #root,
@@ -371,6 +375,8 @@ body {
     overflow-y: auto;
     overflow-x: hidden;
     -webkit-overflow-scrolling: touch; /* momentum scroll on iOS */
+    /* Keep the last control above the iOS home indicator in a native shell. */
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   /* Grow to fit content instead of clipping; still fill the body when short. */
