@@ -1,27 +1,3 @@
-function isQuotaError(err: any): boolean {
-  const code = err?.error?.code || err?.status || err?.code;
-  if (code === 429) return true;
-  const status = err?.error?.status || err?.statusMessage;
-  return status === "RESOURCE_EXHAUSTED";
-}
-
-function getRetryMsFromError(err: any, fallbackMs = 20000): number {
-  try {
-    const details = err?.error?.details || [];
-    const retry = details.find((d: any) => d["@type"]?.includes("RetryInfo"));
-    if (retry?.retryDelay) {
-      const m = /^(\d+)(?:\.(\d+))?s$/.exec(retry.retryDelay);
-      if (m) {
-        const sec = parseInt(m[1], 10);
-        const frac = m[2] ? parseInt(m[2].slice(0, 3).padEnd(3, "0"), 10) : 0; // ms
-        return sec * 1000 + frac;
-      }
-    }
-  } catch {}
-  return fallbackMs;
-}
-
-import { GoogleGenAI } from "@google/genai";
 import {
   getCachedComposite,
   saveCachedComposite,
@@ -36,15 +12,19 @@ export interface OutfitGenerationResult {
 }
 
 // Constants
-// "gemini-2.5-flash-image" is the GA model id. The old "...-preview" alias
-// was retired and now returns 404 from the generateContent endpoint.
-const MODEL = "gemini-2.5-flash-image";
+// We call Google's Gemini 2.5 Flash Image ("Nano Banana") through OpenRouter's
+// OpenAI-compatible API. Use the ":free" suffix on the model id if you'd rather
+// use OpenRouter's rate-limited free tier.
+const MODEL = "google/gemini-2.5-flash-image";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_BODY_PATH = "/assets/model.png";
 const CACHE_PREFIX = "outfit_";
 
-const genAI = new GoogleGenAI({
-  apiKey: import.meta.env.VITE_GOOGLE_API_KEY || "",
-});
+const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
+
+function hasApiKey(): boolean {
+  return Boolean(API_KEY) && !API_KEY.startsWith("your_openrouter_api_key");
+}
 
 function cacheKeyFor(
   topPath: string,
@@ -58,8 +38,6 @@ function cacheKeyFor(
 function buildPrompt(): string {
   return "Create a new image by combining the elements from the provided images. Take the top clothing item from image 1 and the bottom clothing item from image 2, and place them naturally onto the body in image 3 so it looks like the person is wearing the selected outfit. Fit to body shape and pose, preserve garment proportions and textures, match lighting and shadows, handle occlusion by hair and arms. CRITICAL: The background must be completely white (#FFFFFF) - do not use black, transparent, or any other background color. Replace any existing background with solid white. Do not change the person identity or add accessories.";
 }
-
-// Intentionally unused experimental prompt helpers removed to reduce noise
 
 async function toBase64(path: string): Promise<string> {
   const res = await fetch(path);
@@ -93,6 +71,83 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
   return new File([u8arr], filename, { type: mime });
 }
 
+/**
+ * Generate an image via OpenRouter (OpenAI-compatible chat completions with the
+ * "image" modality). `imageB64s` are raw base64 strings (no data: prefix), sent
+ * in order so the prompt can refer to "image 1", "image 2", etc. Returns a
+ * `data:image/png;base64,...` URL. Throws on error (caller maps to a result).
+ */
+async function generateImage(
+  prompt: string,
+  imageB64s: string[]
+): Promise<string> {
+  const content: any[] = [{ type: "text", text: prompt }];
+  for (const b64 of imageB64s) {
+    content.push({
+      type: "image_url",
+      image_url: { url: `data:image/png;base64,${b64}` },
+    });
+  }
+
+  const body = {
+    model: MODEL,
+    modalities: ["image", "text"],
+    messages: [{ role: "user", content }],
+  };
+
+  let attempt = 0;
+  const maxAttempts = 3;
+  while (true) {
+    let resp: Response;
+    try {
+      resp = await fetch(OPENROUTER_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${API_KEY}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": window.location.origin,
+          "X-Title": "Outfit98",
+        },
+        body: JSON.stringify(body),
+      });
+    } catch (err: any) {
+      throw new Error(
+        `Network error calling OpenRouter: ${err?.message || String(err)}`
+      );
+    }
+
+    // Retry on rate-limit (429) with backoff, honoring Retry-After if present.
+    if (resp.status === 429 && attempt < maxAttempts - 1) {
+      attempt += 1;
+      const retryAfter = Number(resp.headers.get("retry-after"));
+      const waitMs =
+        retryAfter > 0
+          ? retryAfter * 1000
+          : Math.round(20000 * Math.pow(2, attempt - 1));
+      await new Promise((r) => setTimeout(r, waitMs));
+      continue;
+    }
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`OpenRouter API error (${resp.status}). ${text}`);
+    }
+
+    const data = await resp.json();
+    const message = data?.choices?.[0]?.message;
+    const url = message?.images?.[0]?.image_url?.url as string | undefined;
+    if (!url) {
+      const txt =
+        typeof message?.content === "string"
+          ? message.content
+          : JSON.stringify(message ?? data);
+      throw new Error(`OpenRouter did not return an image. ${txt}`);
+    }
+    // Already a data:image/...;base64,... URL.
+    return url;
+  }
+}
+
 async function generateOutfitInternal(
   topPath: string,
   bottomPath: string,
@@ -100,10 +155,10 @@ async function generateOutfitInternal(
   topId?: string,
   bottomId?: string
 ): Promise<OutfitGenerationResult> {
-  if (!import.meta.env.VITE_GOOGLE_API_KEY) {
+  if (!hasApiKey()) {
     return {
       success: false,
-      error: "Set VITE_GOOGLE_API_KEY and enable billing for image generation.",
+      error: "Set VITE_OPENROUTER_API_KEY for image generation.",
     };
   }
 
@@ -122,79 +177,27 @@ async function generateOutfitInternal(
   (window as any).__outfitCache =
     (window as any).__outfitCache || new Map<string, string>();
   const cache = (window as any).__outfitCache as Map<string, string>;
+
+  let dataUrl: string;
   if (cache.has(key)) {
-    const dataUrl = cache.get(key)!;
+    dataUrl = cache.get(key)!;
+  } else {
+    const [topB64, bottomB64, bodyB64] = await Promise.all([
+      toBase64(topPath),
+      toBase64(bottomPath),
+      toBase64(bodyPath),
+    ]);
 
-    // If we have IDs, save to Supabase storage
-    if (topId && bottomId) {
-      try {
-        const file = dataUrlToFile(
-          dataUrl,
-          `outfit_${topId}_${bottomId}_${Date.now()}.png`
-        );
-        const storageUrl = await uploadImage("GENERATED", file, file.name);
-        await saveCachedComposite(topId, bottomId, storageUrl);
-        return { success: true, imageUrl: storageUrl };
-      } catch (error) {
-        console.error("Error saving to Supabase:", error);
-        // Fall back to data URL if storage fails
-        return { success: true, imageUrl: dataUrl };
-      }
-    }
-
-    return { success: true, imageUrl: dataUrl };
-  }
-
-  const [topB64, bottomB64, bodyB64] = await Promise.all([
-    toBase64(topPath),
-    toBase64(bottomPath),
-    toBase64(bodyPath),
-  ]);
-
-  const contents = [
-    { text: prompt },
-    { inlineData: { mimeType: "image/png", data: topB64 } }, // image 1 top
-    { inlineData: { mimeType: "image/png", data: bottomB64 } }, // image 2 bottom
-    { inlineData: { mimeType: "image/png", data: bodyB64 } }, // image 3 body
-  ];
-
-  let resp;
-  let attempt = 0;
-  const maxAttempts = 3;
-  while (true) {
     try {
-      resp = await genAI.models.generateContent({ model: MODEL, contents });
-      break;
+      dataUrl = await generateImage(prompt, [topB64, bottomB64, bodyB64]);
     } catch (err: any) {
-      if (!isQuotaError(err) || attempt >= maxAttempts - 1) {
-        const msg =
-          typeof err?.message === "string" ? err.message : JSON.stringify(err);
-        return { success: false, error: `Gemini API error. ${msg}` };
-      }
-      attempt += 1;
-      const base = getRetryMsFromError(err, 20000);
-      const waitMs = Math.round(base * Math.pow(2, attempt - 1));
-      await new Promise((r) => setTimeout(r, waitMs));
+      return {
+        success: false,
+        error: typeof err?.message === "string" ? err.message : String(err),
+      };
     }
+    cache.set(key, dataUrl);
   }
-  const parts = resp.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((p: any) => p.inlineData?.data);
-  if (!imagePart) {
-    const msg =
-      parts
-        .map((p: any) => p.text)
-        .filter(Boolean)
-        .join("\n") || "No image data returned";
-    return { success: false, error: `Gemini did not return an image. ${msg}` };
-  }
-
-  // Fix linter error: check if inlineData exists before accessing data
-  if (!imagePart.inlineData?.data) {
-    return { success: false, error: "No image data in response" };
-  }
-
-  const dataUrl = `data:image/png;base64,${imagePart.inlineData.data}`;
-  cache.set(key, dataUrl);
 
   // If we have IDs, save to Supabase storage
   if (topId && bottomId) {
@@ -215,15 +218,15 @@ async function generateOutfitInternal(
   return { success: true, imageUrl: dataUrl };
 }
 
-// New function for Nano Banana styling with custom prompts
+// Nano Banana styling with a custom occasion prompt
 async function generateNanoOutfitInternal(
   bodyPath: string = DEFAULT_BODY_PATH,
   customPrompt: string
 ): Promise<OutfitGenerationResult> {
-  if (!import.meta.env.VITE_GOOGLE_API_KEY) {
+  if (!hasApiKey()) {
     return {
       success: false,
-      error: "Set VITE_GOOGLE_API_KEY and enable billing for image generation.",
+      error: "Set VITE_OPENROUTER_API_KEY for image generation.",
     };
   }
 
@@ -234,71 +237,34 @@ async function generateNanoOutfitInternal(
     (window as any).__nanoCache || new Map<string, string>();
   const cache = (window as any).__nanoCache as Map<string, string>;
   if (cache.has(key)) {
-    const dataUrl = cache.get(key)!;
-    return { success: true, imageUrl: dataUrl };
+    return { success: true, imageUrl: cache.get(key)! };
   }
 
   const bodyB64 = await toBase64(bodyPath);
 
-  const contents = [
-    { text: customPrompt },
-    { inlineData: { mimeType: "image/png", data: bodyB64 } }, // model image
-  ];
-
-  let resp;
-  let attempt = 0;
-  const maxAttempts = 3;
-  while (true) {
-    try {
-      resp = await genAI.models.generateContent({ model: MODEL, contents });
-      break;
-    } catch (err: any) {
-      if (!isQuotaError(err) || attempt >= maxAttempts - 1) {
-        const msg =
-          typeof err?.message === "string" ? err.message : JSON.stringify(err);
-        return { success: false, error: `Gemini API error. ${msg}` };
-      }
-      attempt += 1;
-      const base = getRetryMsFromError(err, 20000);
-      const waitMs = Math.round(base * Math.pow(2, attempt - 1));
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-  const parts = resp.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((p: any) => p.inlineData?.data);
-  if (!imagePart) {
-    const msg =
-      parts
-        .map((p: any) => p.text)
-        .filter(Boolean)
-        .join("\n") || "No image data returned";
-    return { success: false, error: `Gemini did not return an image. ${msg}` };
+  let dataUrl: string;
+  try {
+    dataUrl = await generateImage(customPrompt, [bodyB64]);
+  } catch (err: any) {
+    return {
+      success: false,
+      error: typeof err?.message === "string" ? err.message : String(err),
+    };
   }
 
-  // Fix linter error: check if inlineData exists before accessing data
-  if (!imagePart.inlineData?.data) {
-    return { success: false, error: "No image data in response" };
-  }
-
-  const dataUrl = `data:image/png;base64,${imagePart.inlineData.data}`;
-  console.log("Generated Nano Outfit Image:", dataUrl);
-  console.log(
-    "You can copy this data URL and paste it in a new browser tab to view the image"
-  );
   cache.set(key, dataUrl);
-
   return { success: true, imageUrl: dataUrl };
 }
 
-// New function for outfit transfer from inspiration image
+// Outfit transfer from an inspiration image
 async function generateOutfitTransferInternal(
   inspirationImagePath: string,
   bodyPath: string = DEFAULT_BODY_PATH
 ): Promise<OutfitGenerationResult> {
-  if (!import.meta.env.VITE_GOOGLE_API_KEY) {
+  if (!hasApiKey()) {
     return {
       success: false,
-      error: "Set VITE_GOOGLE_API_KEY and enable billing for image generation.",
+      error: "Set VITE_OPENROUTER_API_KEY for image generation.",
     };
   }
 
@@ -312,8 +278,7 @@ async function generateOutfitTransferInternal(
     (window as any).__transferCache || new Map<string, string>();
   const cache = (window as any).__transferCache as Map<string, string>;
   if (cache.has(key)) {
-    const dataUrl = cache.get(key)!;
-    return { success: true, imageUrl: dataUrl };
+    return { success: true, imageUrl: cache.get(key)! };
   }
 
   const [bodyB64, inspirationB64] = await Promise.all([
@@ -321,50 +286,18 @@ async function generateOutfitTransferInternal(
     toBase64(inspirationImagePath),
   ]);
 
-  const contents = [
-    { text: transferPrompt },
-    { inlineData: { mimeType: "image/png", data: bodyB64 } }, // image 1 - model
-    { inlineData: { mimeType: "image/png", data: inspirationB64 } }, // image 2 - inspiration
-  ];
-
-  let resp;
-  let attempt = 0;
-  const maxAttempts = 3;
-  while (true) {
-    try {
-      resp = await genAI.models.generateContent({ model: MODEL, contents });
-      break;
-    } catch (err: any) {
-      if (!isQuotaError(err) || attempt >= maxAttempts - 1) {
-        const msg =
-          typeof err?.message === "string" ? err.message : JSON.stringify(err);
-        return { success: false, error: `Gemini API error. ${msg}` };
-      }
-      attempt += 1;
-      const base = getRetryMsFromError(err, 20000);
-      const waitMs = Math.round(base * Math.pow(2, attempt - 1));
-      await new Promise((r) => setTimeout(r, waitMs));
-    }
-  }
-  const parts = resp.candidates?.[0]?.content?.parts || [];
-  const imagePart = parts.find((p: any) => p.inlineData?.data);
-  if (!imagePart) {
-    const msg =
-      parts
-        .map((p: any) => p.text)
-        .filter(Boolean)
-        .join("\n") || "No image data returned";
-    return { success: false, error: `Gemini did not return an image. ${msg}` };
+  let dataUrl: string;
+  try {
+    // image 1 = model, image 2 = inspiration
+    dataUrl = await generateImage(transferPrompt, [bodyB64, inspirationB64]);
+  } catch (err: any) {
+    return {
+      success: false,
+      error: typeof err?.message === "string" ? err.message : String(err),
+    };
   }
 
-  // Fix linter error: check if inlineData exists before accessing data
-  if (!imagePart.inlineData?.data) {
-    return { success: false, error: "No image data in response" };
-  }
-
-  const dataUrl = `data:image/png;base64,${imagePart.inlineData.data}`;
   cache.set(key, dataUrl);
-
   return { success: true, imageUrl: dataUrl };
 }
 

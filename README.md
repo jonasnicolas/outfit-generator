@@ -87,39 +87,32 @@ If items don’t show, double-check that your bucket is public and the table pol
 
 ### 🤖 AI Outfit Previews 
 
-Outfit98 uses the Google Generative AI API to create realistic outfit previews.
-This feature is required for the app to work properly.
+Outfit98 generates realistic outfit previews using Google's **Gemini 2.5 Flash Image** ("Nano Banana") model, accessed through **[OpenRouter](https://openrouter.ai)**. This is optional — the app still runs with the built-in outfits without it.
 
-Important:
-
-You must have a Google Developer account and enable billing on your Google Cloud project.
-The API is not free — you’ll be charged per request.
+Important: image generation is paid (a small cost per image, billed through your OpenRouter credits). OpenRouter also offers a rate-limited free tier of the model if you'd rather not pay.
 
 ### Step 1: Get an API Key
 
-Go to Google AI Studio.
-Sign in with a Google Developer account.
+Go to https://openrouter.ai/keys, sign in, and create a key. Add some credits under **Settings → Credits** (or use the free model tier).
 
-### Step 2: Enable Billing
+### Step 2: Add Your Key
 
-In your Google Cloud project, make sure billing is turned on.
-
-### Step 3: Add Your Key
-
-Copy your key into the .env file:
+Copy your key into the `.env` file:
 ```
-VITE_GOOGLE_API_KEY=your_google_api_key
+VITE_OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
-### Step 4 — Restart the App
+### Step 3 — Restart the App
 
-Once you restart, AI outfit previews will automatically generate as you browse tops and bottoms.
+Once you restart, click **Select** (with a top and bottom chosen) and the AI preview will generate onto the model.
+
+> Want the free tier? Change the model id in `src/services/outfitGenerator.ts` from `google/gemini-2.5-flash-image` to `google/gemini-2.5-flash-image-preview:free`.
 
 ---
 
 ### 🧩 Built With
 
-Electron · React · TypeScript · Vite · 98.css · Supabase · Google Gemini API
+Electron · React · TypeScript · Vite · 98.css · Supabase · OpenRouter (Gemini 2.5 Flash Image)
 
 ---
 

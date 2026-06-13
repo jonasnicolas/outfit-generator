@@ -70,8 +70,8 @@ export function OutfitPreview({
 
         {!hasApiKey && (
           <div className="api-key-message">
-            <p>⚠️ Google API key required</p>
-            <p>Please set VITE_GOOGLE_API_KEY in your .env file</p>
+            <p>⚠️ OpenRouter API key required</p>
+            <p>Please set VITE_OPENROUTER_API_KEY in your .env file</p>
           </div>
         )}
 
