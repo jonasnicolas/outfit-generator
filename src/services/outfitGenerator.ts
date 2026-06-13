@@ -36,7 +36,9 @@ export interface OutfitGenerationResult {
 }
 
 // Constants
-const MODEL = "gemini-2.5-flash-image-preview";
+// "gemini-2.5-flash-image" is the GA model id. The old "...-preview" alias
+// was retired and now returns 404 from the generateContent endpoint.
+const MODEL = "gemini-2.5-flash-image";
 const DEFAULT_BODY_PATH = "/assets/model.png";
 const CACHE_PREFIX = "outfit_";
 
