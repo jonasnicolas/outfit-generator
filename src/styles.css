@@ -359,3 +359,24 @@ body {
   flex: 1;
   min-height: 0; /* prevent overflow from flex children */
 }
+
+/* ===== MOBILE / SHORT-VIEWPORT FIX =====
+   The layout is sized to a desktop window (window-body is locked to the
+   viewport height), so on phones — or any short/narrow window — the taller
+   content gets clipped and the bottom control buttons become unreachable.
+   Here we let the window-body scroll and let the container grow to fit, so
+   every control is reachable. The desktop layout is unchanged. */
+@media (max-width: 768px), (max-height: 760px) {
+  .window > .window-body {
+    overflow-y: auto;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; /* momentum scroll on iOS */
+  }
+
+  /* Grow to fit content instead of clipping; still fill the body when short. */
+  .main-container {
+    height: auto !important; /* overrides the inline calc(100% - 32px) */
+    min-height: calc(100% - 32px);
+  }
+}
+
