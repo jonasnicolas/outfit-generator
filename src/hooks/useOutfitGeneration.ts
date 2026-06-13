@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import {
   outfitGenerator,
   OutfitGenerationResult,
+  isGenerationAvailable,
 } from "../services/outfitGenerator";
 import { imageComposer } from "../services/imageComposer";
 import { rateLimiter } from "../services/rateLimiter";
@@ -23,13 +24,10 @@ export function useOutfitGeneration(): UseOutfitGenerationReturn {
     new Map()
   );
 
-  // Check API key availability
+  // Check whether generation is available (dev key present, or a deployed
+  // build where the serverless proxy holds the key).
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
-    // Treat the .env.example placeholder (and an empty value) as "no key".
-    const hasValidApiKey =
-      Boolean(apiKey) && !apiKey.startsWith("your_openrouter_api_key");
-    setApiRequired(!hasValidApiKey);
+    setApiRequired(!isGenerationAvailable());
   }, []);
 
   const canGenerate = useCallback((): RateLimitResult => {

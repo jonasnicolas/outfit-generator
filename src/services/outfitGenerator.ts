@@ -17,13 +17,22 @@ export interface OutfitGenerationResult {
 // use OpenRouter's rate-limited free tier.
 const MODEL = "google/gemini-2.5-flash-image";
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const PROXY_URL = "/api/generate";
 const DEFAULT_BODY_PATH = "/assets/model.png";
 const CACHE_PREFIX = "outfit_";
 
-const API_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
+// If a client-side key is present (local dev), call OpenRouter directly.
+// Otherwise (deployed build) route through the server-side proxy at
+// /api/generate, so the key stays on the server and never ships to the browser.
+const CLIENT_KEY = import.meta.env.VITE_OPENROUTER_API_KEY || "";
+const HAS_CLIENT_KEY =
+  Boolean(CLIENT_KEY) && !CLIENT_KEY.startsWith("your_openrouter_api_key");
+const USE_PROXY = !HAS_CLIENT_KEY;
 
-function hasApiKey(): boolean {
-  return Boolean(API_KEY) && !API_KEY.startsWith("your_openrouter_api_key");
+// Generation is available when we have a dev key, or we're in a deployed
+// (production) build where the serverless proxy is expected to hold the key.
+export function isGenerationAvailable(): boolean {
+  return HAS_CLIENT_KEY || import.meta.env.PROD;
 }
 
 function cacheKeyFor(
@@ -71,16 +80,29 @@ function dataUrlToFile(dataUrl: string, filename: string): File {
   return new File([u8arr], filename, { type: mime });
 }
 
-/**
- * Generate an image via OpenRouter (OpenAI-compatible chat completions with the
- * "image" modality). `imageB64s` are raw base64 strings (no data: prefix), sent
- * in order so the prompt can refer to "image 1", "image 2", etc. Returns a
- * `data:image/png;base64,...` URL. Throws on error (caller maps to a result).
- */
-async function generateImage(
-  prompt: string,
-  imageB64s: string[]
-): Promise<string> {
+// Build the fetch request for either the proxy or a direct OpenRouter call.
+// `imageB64s` are raw base64 strings (no data: prefix), sent in order so the
+// prompt can refer to "image 1", "image 2", etc.
+function buildRequest(prompt: string, imageB64s: string[]) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  if (USE_PROXY) {
+    // Server-side proxy: send raw base64; the function adds the key + builds
+    // the OpenRouter request.
+    return {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ prompt, images: imageB64s }),
+    };
+  }
+
+  // Direct OpenRouter call (local dev, key in the browser).
+  headers["Authorization"] = `Bearer ${CLIENT_KEY}`;
+  headers["HTTP-Referer"] = window.location.origin;
+  headers["X-Title"] = "Outfit98";
+
   const content: any[] = [{ type: "text", text: prompt }];
   for (const b64 of imageB64s) {
     content.push({
@@ -88,31 +110,32 @@ async function generateImage(
       image_url: { url: `data:image/png;base64,${b64}` },
     });
   }
-
-  const body = {
-    model: MODEL,
-    modalities: ["image", "text"],
-    messages: [{ role: "user", content }],
+  return {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      model: MODEL,
+      modalities: ["image", "text"],
+      messages: [{ role: "user", content }],
+    }),
   };
+}
+
+async function generateImage(
+  prompt: string,
+  imageB64s: string[]
+): Promise<string> {
+  const endpoint = USE_PROXY ? PROXY_URL : OPENROUTER_URL;
 
   let attempt = 0;
   const maxAttempts = 3;
   while (true) {
     let resp: Response;
     try {
-      resp = await fetch(OPENROUTER_URL, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-          "Content-Type": "application/json",
-          "HTTP-Referer": window.location.origin,
-          "X-Title": "Outfit98",
-        },
-        body: JSON.stringify(body),
-      });
+      resp = await fetch(endpoint, buildRequest(prompt, imageB64s));
     } catch (err: any) {
       throw new Error(
-        `Network error calling OpenRouter: ${err?.message || String(err)}`
+        `Network error reaching image service: ${err?.message || String(err)}`
       );
     }
 
@@ -128,20 +151,22 @@ async function generateImage(
       continue;
     }
 
+    const data = await resp.json().catch(() => null);
+
     if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      throw new Error(`OpenRouter API error (${resp.status}). ${text}`);
+      const detail =
+        data?.error?.message || data?.error || JSON.stringify(data) || "";
+      throw new Error(`Image API error (${resp.status}). ${detail}`);
     }
 
-    const data = await resp.json();
-    const message = data?.choices?.[0]?.message;
-    const url = message?.images?.[0]?.image_url?.url as string | undefined;
+    // Proxy responds with { imageUrl }; direct OpenRouter nests it under choices.
+    const url: string | undefined = USE_PROXY
+      ? data?.imageUrl
+      : data?.choices?.[0]?.message?.images?.[0]?.image_url?.url;
     if (!url) {
-      const txt =
-        typeof message?.content === "string"
-          ? message.content
-          : JSON.stringify(message ?? data);
-      throw new Error(`OpenRouter did not return an image. ${txt}`);
+      throw new Error(
+        `No image returned. ${JSON.stringify(data ?? {}).slice(0, 300)}`
+      );
     }
     // Already a data:image/...;base64,... URL.
     return url;
@@ -155,7 +180,7 @@ async function generateOutfitInternal(
   topId?: string,
   bottomId?: string
 ): Promise<OutfitGenerationResult> {
-  if (!hasApiKey()) {
+  if (!isGenerationAvailable()) {
     return {
       success: false,
       error: "Set VITE_OPENROUTER_API_KEY for image generation.",
@@ -223,7 +248,7 @@ async function generateNanoOutfitInternal(
   bodyPath: string = DEFAULT_BODY_PATH,
   customPrompt: string
 ): Promise<OutfitGenerationResult> {
-  if (!hasApiKey()) {
+  if (!isGenerationAvailable()) {
     return {
       success: false,
       error: "Set VITE_OPENROUTER_API_KEY for image generation.",
@@ -261,7 +286,7 @@ async function generateOutfitTransferInternal(
   inspirationImagePath: string,
   bodyPath: string = DEFAULT_BODY_PATH
 ): Promise<OutfitGenerationResult> {
-  if (!hasApiKey()) {
+  if (!isGenerationAvailable()) {
     return {
       success: false,
       error: "Set VITE_OPENROUTER_API_KEY for image generation.",
