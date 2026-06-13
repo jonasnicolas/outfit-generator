@@ -179,8 +179,10 @@ function App() {
 
   // Check if API key is configured
   const hasApiKey = Boolean(
-    import.meta.env.VITE_GOOGLE_API_KEY &&
-      import.meta.env.VITE_GOOGLE_API_KEY !== "your_google_api_key_here"
+    import.meta.env.VITE_OPENROUTER_API_KEY &&
+      !import.meta.env.VITE_OPENROUTER_API_KEY.startsWith(
+        "your_openrouter_api_key"
+      )
   );
 
   // Test connection function

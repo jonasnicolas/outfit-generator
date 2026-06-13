@@ -25,9 +25,10 @@ export function useOutfitGeneration(): UseOutfitGenerationReturn {
 
   // Check API key availability
   useEffect(() => {
-    const apiKey = import.meta.env.VITE_GOOGLE_API_KEY;
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY;
     // Treat the .env.example placeholder (and an empty value) as "no key".
-    const hasValidApiKey = Boolean(apiKey) && !apiKey.startsWith("your_google_api_key");
+    const hasValidApiKey =
+      Boolean(apiKey) && !apiKey.startsWith("your_openrouter_api_key");
     setApiRequired(!hasValidApiKey);
   }, []);
 

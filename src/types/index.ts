@@ -106,7 +106,7 @@ export interface PromptPart {
 
 // ===== Environment Types =====
 export interface EnvironmentConfig {
-  VITE_GOOGLE_API_KEY?: string;
+  VITE_OPENROUTER_API_KEY?: string;
 }
 
 // ===== Error Types =====
