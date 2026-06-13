@@ -9,6 +9,7 @@ import {
   ClothingItem as SupabaseClothingItem,
 } from "./lib/supabase";
 import { rateLimiter } from "./services/rateLimiter";
+import { isGenerationAvailable } from "./services/outfitGenerator";
 import { tops as defaultTops, bottoms as defaultBottoms } from "./data/items";
 import { LocalClothingItem, RateLimitResult } from "./types";
 
@@ -178,12 +179,7 @@ function App() {
   } = useOutfitGeneration();
 
   // Check if API key is configured
-  const hasApiKey = Boolean(
-    import.meta.env.VITE_OPENROUTER_API_KEY &&
-      !import.meta.env.VITE_OPENROUTER_API_KEY.startsWith(
-        "your_openrouter_api_key"
-      )
-  );
+  const hasApiKey = isGenerationAvailable();
 
   // Test connection function
 

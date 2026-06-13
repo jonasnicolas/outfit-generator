@@ -108,6 +108,18 @@ Once you restart, click **Select** (with a top and bottom chosen) and the AI pre
 
 > Want the free tier? Change the model id in `src/services/outfitGenerator.ts` from `google/gemini-2.5-flash-image` to `google/gemini-2.5-flash-image-preview:free`.
 
+### Deploying (keep your key private)
+
+`VITE_`-prefixed vars are bundled into the browser, so **don't** put `VITE_OPENROUTER_API_KEY` on a public deploy — anyone could read it and spend your credits.
+
+Instead, this app ships a serverless proxy at **`api/generate.ts`**. On a host like Vercel:
+
+1. Add a **server-only** environment variable named **`OPENROUTER_API_KEY`** (no `VITE_` prefix).
+2. Do **not** set `VITE_OPENROUTER_API_KEY` in the deploy.
+3. Redeploy.
+
+The browser then calls `/api/generate`, which talks to OpenRouter from the server — your key never reaches the client. (Locally, with `VITE_OPENROUTER_API_KEY` set, the app calls OpenRouter directly so `npm run dev` works without the proxy.)
+
 ---
 
 ### 🧩 Built With
