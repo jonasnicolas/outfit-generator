@@ -56,3 +56,32 @@ URL (the app would no longer share an origin with `/api/generate`).
 - **Web/content change:** just deploy to Vercel — live apps pick it up.
 - **Native change** (icon, config, Capacitor/plugin upgrade): `npm run cap:sync`,
   then rebuild in Xcode / Android Studio and resubmit.
+
+## CI — Android builds on GitHub Actions
+
+[`.github/workflows/android.yml`](./.github/workflows/android.yml) builds the
+Android app on every push:
+
+- Always produces an installable **debug APK** (artifact `outfit98-debug-apk`),
+  no secrets required.
+- If release-keystore secrets are configured, also produces a **signed `.aab`**
+  (artifact `outfit98-release-aab`) ready for the Play Store.
+
+To enable the signed `.aab`, create a keystore and add four repo secrets
+(**Settings → Secrets and variables → Actions**):
+
+```bash
+keytool -genkey -v -keystore release.jks -keyalg RSA -keysize 2048 \
+  -validity 10000 -alias outfit98
+base64 -w0 release.jks    # macOS: base64 -i release.jks
+```
+
+| Secret | Value |
+| --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | base64 output above |
+| `ANDROID_KEYSTORE_PASSWORD` | keystore password |
+| `ANDROID_KEY_ALIAS` | `outfit98` (or your alias) |
+| `ANDROID_KEY_PASSWORD` | key password |
+
+Download builds from the run's **Artifacts** section. iOS isn't built in CI
+(it needs macOS + Xcode signing); build it locally per the steps above.
