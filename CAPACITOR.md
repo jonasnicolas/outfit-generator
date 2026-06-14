@@ -85,3 +85,29 @@ base64 -w0 release.jks    # macOS: base64 -i release.jks
 
 Download builds from the run's **Artifacts** section. iOS isn't built in CI
 (it needs macOS + Xcode signing); build it locally per the steps above.
+
+## CD — auto-deploy to the Play Store (Fastlane)
+
+On pushes to `main`, the workflow's `deploy` job uploads the signed `.aab` to
+the Play Store **internal testing** track using
+[Fastlane](https://fastlane.tools/) (`fastlane/Fastfile`, `Gemfile`). The
+version code is set automatically from the CI run number, so each upload is
+unique and increasing.
+
+This job is **inert until you configure it** — it only runs when both the
+keystore secrets (above) and a Play service-account secret are present, so CI
+stays green in the meantime.
+
+One-time setup:
+
+1. **Create the app in the Play Console** and upload one `.aab` **manually**
+   to the internal track. Google requires the first release by hand; API
+   uploads only work afterward.
+2. **Create a service account** with Play Developer API access
+   (Play Console → *Users and permissions* → invite the service account, grant
+   *Release to testing tracks*), download its JSON key.
+3. Add the JSON (whole file contents) as the repo secret
+   **`GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`**.
+
+After that, every push to `main` ships a new build to the internal track.
+To run it by hand: `bundle exec fastlane internal`.
