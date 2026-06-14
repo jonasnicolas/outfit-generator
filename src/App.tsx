@@ -491,6 +491,17 @@ function App() {
       style={{ width: "100vw", height: "100vh", margin: 0 }}
     >
       <div className="title-bar">
+        <img
+          src="/wardrobe.svg"
+          alt=""
+          aria-hidden="true"
+          style={{
+            width: 18,
+            height: 18,
+            marginRight: 4,
+            imageRendering: "auto",
+          }}
+        />
         <div className="title-bar-text">What should I wear today?</div>
         <div className="title-bar-controls">
           <button aria-label="Minimize"></button>
