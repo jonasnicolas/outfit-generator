@@ -11,6 +11,11 @@ name: Android build
 #   Create a keystore: keytool -genkey -v -keystore release.jks \
 #     -keyalg RSA -keysize 2048 -validity 10000 -alias outfit98
 #   Encode it:         base64 -w0 release.jks   (macOS: base64 -i release.jks)
+#
+# On pushes to main, if a Google Play service-account secret is ALSO set
+# (GOOGLE_PLAY_SERVICE_ACCOUNT_JSON), the signed .aab is uploaded to the Play
+# Store internal track via Fastlane. See CAPACITOR.md for the one-time setup
+# (the very first release must be uploaded manually in the Play Console).
 
 on:
   push:
@@ -76,6 +81,8 @@ jobs:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # Unique, increasing version code per run (required by the Play Store).
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew bundleRelease --no-daemon
 
       - name: Upload release AAB
@@ -85,3 +92,35 @@ jobs:
           name: outfit98-release-aab
           path: android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
+
+  # Deploys the signed .aab to the Play Store internal track on pushes to main.
+  # Steps are inert (skipped) until BOTH the keystore and Play service-account
+  # secrets are configured, so this job stays green in the meantime.
+  deploy:
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+      HAS_PLAY: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON != '' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download release AAB
+        if: env.HAS_KEYSTORE == 'true' && env.HAS_PLAY == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: outfit98-release-aab
+          path: aab
+
+      - uses: ruby/setup-ruby@v1
+        if: env.HAS_KEYSTORE == 'true' && env.HAS_PLAY == 'true'
+        with:
+          ruby-version: "3.3"
+          bundler-cache: true
+
+      - name: Upload to Play Store (internal track)
+        if: env.HAS_KEYSTORE == 'true' && env.HAS_PLAY == 'true'
+        env:
+          GOOGLE_PLAY_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON }}
+        run: bundle exec fastlane internal aab:aab/app-release.aab

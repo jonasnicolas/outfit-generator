@@ -1,0 +1,17 @@
+default_platform(:android)
+
+platform :android do
+  desc "Upload the release .aab to the Play Store internal testing track"
+  lane :internal do |options|
+    upload_to_play_store(
+      track: "internal",
+      aab: options[:aab] || "android/app/build/outputs/bundle/release/app-release.aab",
+      json_key_data: ENV["GOOGLE_PLAY_SERVICE_ACCOUNT_JSON"],
+      release_status: "completed",
+      skip_upload_apk: true,
+      skip_upload_metadata: true,
+      skip_upload_images: true,
+      skip_upload_screenshots: true,
+    )
+  end
+end
