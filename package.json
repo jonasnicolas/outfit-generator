@@ -15,9 +15,16 @@
     "start": "cross-env NODE_ENV=production electron .",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "build-electron": "npm run build && electron-builder"
+    "build-electron": "npm run build && electron-builder",
+    "cap:sync": "npm run build:renderer && cap sync",
+    "cap:assets": "capacitor-assets generate --iconBackgroundColor #dce2f0 --splashBackgroundColor #dce2f0",
+    "cap:ios": "cap open ios",
+    "cap:android": "cap open android"
   },
   "dependencies": {
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
     "@google/genai": "^1.17.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/supabase-js": "^2.57.4",
@@ -27,6 +34,8 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
