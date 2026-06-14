@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <radialGradient id="door" cx="50%" cy="42%" r="65%">
+      <stop offset="0%" stop-color="#f7c194"/>
+      <stop offset="100%" stop-color="#df9b5b"/>
+    </radialGradient>
+    <radialGradient id="panel" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#fbd2ab"/>
+      <stop offset="100%" stop-color="#eaa970"/>
+    </radialGradient>
+  </defs>
+
+  <!-- background -->
+  <rect x="0" y="0" width="512" height="512" fill="#dce2f0"/>
+
+  <!-- floor shadow -->
+  <ellipse cx="256" cy="436" rx="150" ry="20" fill="#b9c5d3"/>
+
+  <g stroke="#43291a" stroke-width="8" stroke-linejoin="round" stroke-linecap="round">
+    <!-- crown / pediment -->
+    <path d="M150 134 V104 C168 104 190 80 256 80 C322 80 344 104 362 104 V134 Z" fill="#e8a468"/>
+
+    <!-- body -->
+    <rect x="162" y="122" width="188" height="252" rx="14" fill="#e8a468"/>
+
+    <!-- base plinth -->
+    <rect x="156" y="366" width="200" height="20" rx="7" fill="#e8a468"/>
+    <!-- feet -->
+    <rect x="172" y="384" width="36" height="28" rx="6" fill="#e8a468"/>
+    <rect x="304" y="384" width="36" height="28" rx="6" fill="#e8a468"/>
+
+    <!-- left door -->
+    <rect x="174" y="134" width="78" height="228" rx="8" fill="url(#door)"/>
+    <!-- right door -->
+    <rect x="260" y="134" width="78" height="228" rx="8" fill="url(#door)"/>
+
+    <!-- door panel insets -->
+    <rect x="190" y="158" width="46" height="180" rx="23" fill="url(#panel)" stroke-width="6"/>
+    <rect x="276" y="158" width="46" height="180" rx="23" fill="url(#panel)" stroke-width="6"/>
+
+    <!-- knobs near the centre seam -->
+    <circle cx="244" cy="250" r="7" fill="#43291a" stroke="none"/>
+    <circle cx="268" cy="250" r="7" fill="#43291a" stroke="none"/>
+  </g>
+</svg>
