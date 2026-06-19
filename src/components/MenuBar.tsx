@@ -1,51 +1,27 @@
+import { useTheme, THEMES, type ThemeId } from "../hooks/useTheme";
+
 export function MenuBar() {
+  const [theme, setTheme] = useTheme();
   return (
-    <div
-      style={{
-        display: "flex",
-        gap: 16,
-        padding: "8px 10px",
-        fontSize: 14,
-      }}
-    >
-      <a href="#" style={{ textDecoration: "underline", color: "#000" }}>
-        File
-      </a>
-      <a href="#" style={{ textDecoration: "underline", color: "#000" }}>
-        Edit
-      </a>
-      <a href="#" style={{ textDecoration: "underline", color: "#000" }}>
-        View
-      </a>
-      <a href="#" style={{ textDecoration: "underline", color: "#000" }}>
-        Help
-      </a>
-      {/* <button
-        onClick={onTestConnection}
-        style={{
-          padding: "2px 8px",
-          fontSize: "12px",
-          background: "#c0c0c0",
-          border: "1px outset #c0c0c0",
-          cursor: "pointer",
-          marginLeft: "8px",
-        }}
-      >
-        Test DB
-      </button>
-      <button
-        onClick={onDebugDataMismatch}
-        style={{
-          padding: "2px 8px",
-          fontSize: "12px",
-          background: "#c0c0c0",
-          border: "1px outset #c0c0c0",
-          cursor: "pointer",
-          marginLeft: "8px",
-        }}
-      >
-        Check Data
-      </button> */}
+    <div className="menu-bar">
+      <a href="#">File</a>
+      <a href="#">Edit</a>
+      <a href="#">View</a>
+      <a href="#">Help</a>
+      <label className="theme-switcher">
+        Theme:
+        <select
+          value={theme}
+          onChange={(e) => setTheme(e.target.value as ThemeId)}
+          aria-label="Theme"
+        >
+          {THEMES.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
+          ))}
+        </select>
+      </label>
     </div>
   );
 }

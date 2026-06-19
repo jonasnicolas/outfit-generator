@@ -514,7 +514,7 @@ function App() {
         style={{
           padding: 0,
           height: "calc(100vh - 36px)",
-          background: "#c0c0c0",
+          background: "var(--window-bg, #c0c0c0)",
         }}
       >
         <MenuBar />

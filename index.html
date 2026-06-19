@@ -15,6 +15,14 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="Outfit98" />
     <title>Outfit98</title>
+    <!-- Apply the saved theme before first paint (avoids a flash of Classic). -->
+    <script>
+      try {
+        var t = localStorage.getItem("outfit98-theme");
+        if (t && t !== "classic")
+          document.documentElement.setAttribute("data-theme", t);
+      } catch (e) {}
+    </script>
     <link rel="stylesheet" href="https://unpkg.com/98.css@0.2.1/build/98.css" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>

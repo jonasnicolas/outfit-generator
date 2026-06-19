@@ -1,3 +1,37 @@
+/* ===== THEMES =====
+   The full-screen .window covers the body, so the visible backdrop is the
+   window-body (behind the pixel-art) plus the title bar. Themes recolor those
+   via CSS variables; the bespoke PNG art is left untouched (it reads like app
+   windows sitting on a themed desktop). Default (no data-theme) = Classic. */
+:root {
+  --desktop-bg: #c0c0c0;
+  --window-bg: #c0c0c0;
+  --titlebar-bg: linear-gradient(90deg, #000080, #1084d0);
+  --titlebar-fg: #ffffff;
+  --menu-fg: #000000;
+}
+html[data-theme="dark"] {
+  --desktop-bg: #15151f;
+  --window-bg: #25252f;
+  --titlebar-bg: linear-gradient(90deg, #0a0f1f, #2e3c6e);
+  --titlebar-fg: #eaeaf2;
+  --menu-fg: #dcdce6;
+}
+html[data-theme="hotdog"] {
+  --desktop-bg: #c00000;
+  --window-bg: #ffff00;
+  --titlebar-bg: linear-gradient(90deg, #d40000, #ff3b3b);
+  --titlebar-fg: #ffff00;
+  --menu-fg: #000000;
+}
+html[data-theme="ocean"] {
+  --desktop-bg: #008080;
+  --window-bg: #cfe3e3;
+  --titlebar-bg: linear-gradient(90deg, #005a5a, #00a6a6);
+  --titlebar-fg: #ffffff;
+  --menu-fg: #003333;
+}
+
 html,
 body,
 #root {
@@ -11,7 +45,7 @@ body {
   margin: 0;
   padding: 0;
   background-color: #c0c0c0; /* Fallback */
-  background: #c0c0c0;
+  background: var(--desktop-bg, #c0c0c0);
   width: 100vw;
   height: 100vh;
   overflow: hidden; /* Prevent scrolling */
@@ -344,6 +378,39 @@ body {
 
 .folder-button:active {
   transform: translateY(1px);
+}
+
+/* ===== THEMED CHROME (overrides 98.css; styles.css loads after it) ===== */
+.title-bar {
+  background: var(--titlebar-bg);
+  color: var(--titlebar-fg);
+}
+.title-bar-text {
+  color: var(--titlebar-fg);
+}
+
+.menu-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: var(--menu-fg, #000);
+}
+.menu-bar a {
+  text-decoration: underline;
+  color: inherit;
+}
+.theme-switcher {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: inherit;
+}
+.theme-switcher select {
+  font-size: 12px;
 }
 
 /* Make the root 98.css window fill the screen exactly */
